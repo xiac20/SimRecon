@@ -25,8 +25,8 @@ Zizhuo Wang<sup>1</sup>,
 **SimRecon:** We propose SimRecon,a novel compositional scene reconstruction framework that implements a "Perception-Generation-Simulation" pipeline with specialized bridging modules to ensure high visual fidelity and physical plausibility.
 
 ## 📢 News
-- 🔥 [22/02/2026] We release "SimRecon: SimReady Compositional Scene Reconstruction from Real Videos". Check our [project page](https://xiac20.github.io/SimRecon) and [arXiv paper](https://arxiv.org/abs/2507.19058).
-- 🔥 [22/02/2026] We release the code of our Active Viewpoint Optimization (AVO) module. Other parts of the project will be released soon.
+- 🔥 [03/03/2026] We release "SimRecon: SimReady Compositional Scene Reconstruction from Real Videos". Check our [project page](https://xiac20.github.io/SimRecon) and [arXiv paper](https://arxiv.org/abs/2507.19058).
+- 🔥 [03/03/2026] We release the code of our Active Viewpoint Optimization (AVO) module. Other parts of the project will be released soon.
 
 
 ## 🌟 Pipeline
@@ -36,11 +36,11 @@ Zizhuo Wang<sup>1</sup>,
 
 <strong>The overall framework of our approach SimRecon.</strong> We propose a “Perception-Generation-Simulation” pipeline with object-centric scene representations towards compositional 3D scene reconstruction from cluttered video input. In this figure, we provide illustrative visualizations using the backpack as the example to introduce our two core modules: Active Viewpoint Optimization (AVO) and Scene Graph Synthesizer (SGS). There, we visualize a semantic-level graph for clarity, while our framework operates at the instance-level.
 
-## 🎨 Video Demos
+<!-- ## 🎨 Video Demos
 
 <video width="100%" controls autoplay loop muted>
   <source src="assets/demo.mp4" type="video/mp4">
-</video>
+</video> -->
 
 ## ⚙️ Setup
 

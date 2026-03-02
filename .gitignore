@@ -1,0 +1,74 @@
+# Python 字节码缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# C 扩展编译产物
+*.so
+*.o
+
+# 构建目录
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# 分发打包
+*.tar.gz
+*.whl
+
+# PyInstaller
+*.manifest
+*.spec
+
+# 单元测试 / 覆盖率报告
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+*.cover
+*.py,cover
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# 环境变量
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 训练输出 / 实验结果
+output/
+outputs/
+checkpoints/
+logs/
+wandb/
+runs/
+*.ply
+*.pth
+*.pt
+*.ckpt
+*.pkl
+*.npz
+*.npy
+
+# 操作系统
+.DS_Store
+Thumbs.db
