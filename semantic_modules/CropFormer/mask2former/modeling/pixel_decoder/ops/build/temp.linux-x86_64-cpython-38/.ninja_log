@@ -1,0 +1,4 @@
+# ninja log v5
+0	4834	1756375718568377857	/home/xc/Desktop/VideoEdit/InstaScene/semantic_modules/CropFormer/mask2former/modeling/pixel_decoder/ops/build/temp.linux-x86_64-cpython-38/home/xc/Desktop/VideoEdit/InstaScene/semantic_modules/CropFormer/mask2former/modeling/pixel_decoder/ops/src/cpu/ms_deform_attn_cpu.o	1a9c47124011e377
+1	15852	1756375729588367255	/home/xc/Desktop/VideoEdit/InstaScene/semantic_modules/CropFormer/mask2former/modeling/pixel_decoder/ops/build/temp.linux-x86_64-cpython-38/home/xc/Desktop/VideoEdit/InstaScene/semantic_modules/CropFormer/mask2former/modeling/pixel_decoder/ops/src/vision.o	c99f3722ca8ae4a2
+0	15943	1756375729668367178	/home/xc/Desktop/VideoEdit/InstaScene/semantic_modules/CropFormer/mask2former/modeling/pixel_decoder/ops/build/temp.linux-x86_64-cpython-38/home/xc/Desktop/VideoEdit/InstaScene/semantic_modules/CropFormer/mask2former/modeling/pixel_decoder/ops/src/cuda/ms_deform_attn_cuda.o	49b8a17c832c0dce

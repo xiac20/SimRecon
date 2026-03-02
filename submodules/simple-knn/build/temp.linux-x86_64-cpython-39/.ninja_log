@@ -1,0 +1,5 @@
+# ninja log v5
+0	10943	1755610977551325149	/home/xc/Desktop/VideoEdit/InstaScene/submodules/simple-knn/build/temp.linux-x86_64-cpython-39/simple_knn.o	353f5208391c96a2
+0	17057	1755610983671442255	/home/xc/Desktop/VideoEdit/InstaScene/submodules/simple-knn/build/temp.linux-x86_64-cpython-39/ext.o	b5716ed52ed2ba72
+0	48668	1755611015260048630	/home/xc/Desktop/VideoEdit/InstaScene/submodules/simple-knn/build/temp.linux-x86_64-cpython-39/spatial.o	61342bb7a1698556
+12	15273	1756391414692349778	/home/xc/Desktop/VideoEdit/InstaScene/submodules/simple-knn/build/temp.linux-x86_64-cpython-39/ext.o	b5716ed52ed2ba72

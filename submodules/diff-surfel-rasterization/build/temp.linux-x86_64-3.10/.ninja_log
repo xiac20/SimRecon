@@ -1,0 +1,6 @@
+# ninja log v5
+0	3543	1755582563667944562	/home/xc/Desktop/VideoEdit/InstaScene/submodules/diff-surfel-rasterization/build/temp.linux-x86_64-3.10/cuda_rasterizer/backward.o	6bb5b8e4b849bd42
+1	3647	1755582563771944354	/home/xc/Desktop/VideoEdit/InstaScene/submodules/diff-surfel-rasterization/build/temp.linux-x86_64-3.10/cuda_rasterizer/forward.o	71e386425f48d7ea
+1	10268	1755582570387931209	/home/xc/Desktop/VideoEdit/InstaScene/submodules/diff-surfel-rasterization/build/temp.linux-x86_64-3.10/cuda_rasterizer/rasterizer_impl.o	c037efd407b84d0a
+2	16497	1755582576623918907	/home/xc/Desktop/VideoEdit/InstaScene/submodules/diff-surfel-rasterization/build/temp.linux-x86_64-3.10/ext.o	77dbbd8c91c519ea
+2	44041	1755582604139865613	/home/xc/Desktop/VideoEdit/InstaScene/submodules/diff-surfel-rasterization/build/temp.linux-x86_64-3.10/rasterize_points.o	ec379c3643b986d4
