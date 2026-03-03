@@ -16,7 +16,7 @@ Zizhuo Wang<sup>1</sup>,
 
 <h3 align="center">CVPR 2026 🔥</h3>
 
-<a href="https://arxiv.org/abs/2603.02134"><img src='https://img.shields.io/badge/arXiv-2603.02134-b31b1b.svg'></a> &nbsp;&nbsp;&nbsp;&nbsp;
+<a href="https://arxiv.org/abs/2603.02133"><img src='https://img.shields.io/badge/arXiv-2603.02133-b31b1b.svg'></a> &nbsp;&nbsp;&nbsp;&nbsp;
 <a href="https://xiac20.github.io/SimRecon"><img src='https://img.shields.io/badge/Project-Page-Green'></a> &nbsp;&nbsp;&nbsp;&nbsp;
 <a><img src='https://img.shields.io/badge/License-MIT-blue'></a> &nbsp;&nbsp;&nbsp;&nbsp;
 
@@ -26,7 +26,7 @@ Zizhuo Wang<sup>1</sup>,
 **SimRecon:** We propose SimRecon,a novel compositional scene reconstruction framework that implements a "Perception-Generation-Simulation" pipeline with specialized bridging modules to ensure high visual fidelity and physical plausibility.
 
 ## 📢 News
-- 🔥 [03/03/2026] We release "SimRecon: SimReady Compositional Scene Reconstruction from Real Videos". Check our [project page](https://xiac20.github.io/SimRecon) and [arXiv paper](https://arxiv.org/abs/2603.02134).
+- 🔥 [03/03/2026] We release "SimRecon: SimReady Compositional Scene Reconstruction from Real Videos". Check our [project page](https://xiac20.github.io/SimRecon) and [arXiv paper](https://arxiv.org/abs/2603.02133).
 - 🔥 [03/03/2026] We release the code of our Active Viewpoint Optimization (AVO) module. Other parts of the project will be released soon.
 
 
