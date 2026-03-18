@@ -27,7 +27,9 @@ Zizhuo Wang<sup>1</sup>,
 
 ## 📢 News
 - 🔥 [03/03/2026] We release "SimRecon: SimReady Compositional Scene Reconstruction from Real Videos". Check our [project page](https://xiac20.github.io/SimRecon) and [arXiv paper](https://arxiv.org/abs/2603.02133).
-- 🔥 [03/03/2026] We release the code of our Active Viewpoint Optimization (AVO) module. Other parts of the project will be released soon.
+- 🔥 [03/03/2026] We release the code of our Active Viewpoint Optimization (AVO) module. 
+- 🔥 [03/18/2026] We release the code of our Scene Graph Synthesizer (SGS) module. 
+- 🔥 [03/18/2026] To accommodate diverse choices in 3D asset generation models and physical simulators, we leave their specific implementations open for user customization.
 
 
 ## 🌟 Pipeline
@@ -86,6 +88,7 @@ cd ..
 pip install -r requirements.txt
 pip install -U openmim
 mim install mmcv
+pip install transformers
 mkdir ckpts
 ```
 Manually
@@ -154,6 +157,28 @@ python optimize_by_avo.py --source_path data/scene0000_00 --label_dir output/dat
 - Before optimization, you can view the point cloud of each object under output/data/scene0000_00/train_semanticgs/point_cloud/iteration_2500/label_pointclouds.
 - For situations where AVO results are not ideal, please adjust some hyperparameters, such as learning rates for rotation and translation, depth constraint coefficients, etc. The number of optimization rounds can also be adjusted up to 5000 rounds.
 - For cases where optimization fails due to artifact drift in the 2dgs output point cloud, check out some recent works dedicated to solving such problems.
+
+### 3. Generate 3D assets
+Users can generate 3D assets by leveraging the optimized best views.
+
+### 4. Generate instance projected frames
+```bash
+python coverage_sampling.py --scene_path data/scene0000_00 --num_frames 20 --copy_images
+```
+- This step leverages VGGT to rapidly sample symbol views exhibiting the maximum voxel coverage.
+```bash
+python project_instances_to_frames.py --source_path data/scene0000_00 --label_dir output/data/scene0000_00/train_semanticgs/point_cloud/iteration_2500 --sampled_images_dir data/scene0000_00/sampled_images
+```
+- Users can adjust specific hyperparameters within the script such as min_visible_pixels and min_num_points to ensure an appropriate number of instances.
+
+### 5. Infer final scene graphs
+```bash
+python infer_scene_graph.py  --instance_project_dir output/data/scene0000_00/train_semanticgs/point_cloud/iteration_2500/instance_project  --output_dir output/data/scene0000_00/train_semanticgs/point_cloud/iteration_2500/scene_graphs
+```
+```bash
+python merge_scene_graphs.py --scene_graphs_dir output/data/scene0000_00/train_semanticgs/point_cloud/iteration_2500/scene_graphs
+```
+- Users can subsequently leverage the inferred scene graphs to ascertain relative object relationships within the simulator and activate the simulation to obtain final physically plausible scenes.
 
 
 ## 🔗Acknowledgement
