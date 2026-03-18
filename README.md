@@ -26,10 +26,10 @@ Zizhuo Wang<sup>1</sup>,
 **SimRecon:** We propose SimRecon,a novel compositional scene reconstruction framework that implements a "Perception-Generation-Simulation" pipeline with specialized bridging modules to ensure high visual fidelity and physical plausibility.
 
 ## 📢 News
-- 🔥 [03/03/2026] We release "SimRecon: SimReady Compositional Scene Reconstruction from Real Videos". Check our [project page](https://xiac20.github.io/SimRecon) and [arXiv paper](https://arxiv.org/abs/2603.02133).
-- 🔥 [03/03/2026] We release the code of our Active Viewpoint Optimization (AVO) module. 
-- 🔥 [03/18/2026] We release the code of our Scene Graph Synthesizer (SGS) module. 
+- 🔥 [03/18/2026] We release the code of our Scene Graph Synthesizer (SGS) module, making our entire codebase fully open-sourced.
 - 🔥 [03/18/2026] To accommodate diverse choices in 3D asset generation models and physical simulators, we leave their specific implementations open for user customization.
+- 🔥 [03/03/2026] We release the code of our Active Viewpoint Optimization (AVO) module. 
+- 🔥 [03/03/2026] We release "SimRecon: SimReady Compositional Scene Reconstruction from Real Videos". Check our [project page](https://xiac20.github.io/SimRecon) and [arXiv paper](https://arxiv.org/abs/2603.02133).
 
 
 ## 🌟 Pipeline
@@ -185,7 +185,7 @@ python merge_scene_graphs.py --scene_graphs_dir output/data/scene0000_00/train_s
 
 We are thankful for the following great works when implementing SimRecon:
 
-- [2DGS](https://github.com/hbb1/2d-gaussian-splatting), [InstaScene](https://github.com/zju3dv/InstaScene), [Rodin](https://github.com/CLAY-3D/OpenCLAY?tab=readme-ov-file), [SAM](https://github.com/facebookresearch/segment-anything)
+- [2DGS](https://github.com/hbb1/2d-gaussian-splatting), [InstaScene](https://github.com/zju3dv/InstaScene), [Rodin](https://github.com/CLAY-3D/OpenCLAY?tab=readme-ov-file), [SAM](https://github.com/facebookresearch/segment-anything), [VGGT](https://github.com/facebookresearch/vggt), [Spatial-MLLM](https://github.com/THU-SI/Spatial-MLLM)
 
 ## 📚Citation
 
