@@ -17,11 +17,12 @@ import torch
 import open3d as o3d
 from vis_utils.color_utils import generate_semantic_colors
 
-# ===================== ScanNet 类别 + CLIP 分类 =====================
-SCANNET_LABELS_PATH = "/dataxl/xc/datasets/scannet_online/scannet-mv1/meta_data/scannetv2-labels.combined.tsv"
+# ===================== ScanNet Categories + CLIP Classification =====================
+# You can download this tsv file from official ScanNet dataset metadata.
+SCANNET_LABELS_PATH = "/scannet/meta_data/scannetv2-labels.combined.tsv"
 
 def load_scannet_categories(tsv_path: str = SCANNET_LABELS_PATH) -> List[str]:
-    """从 ScanNet 标签文件加载去重后的类别列表。"""
+    """Load deduplicated category list from ScanNet label file."""
     categories = set()
     if not os.path.exists(tsv_path):
         print(f"⚠️ ScanNet labels not found: {tsv_path}, using default categories")
@@ -31,19 +32,19 @@ def load_scannet_categories(tsv_path: str = SCANNET_LABELS_PATH) -> List[str]:
                 "box", "whiteboard", "backpack", "towel", "object"]
     with open(tsv_path, "r") as f:
         for i, line in enumerate(f):
-            if i == 0:  # 跳过 header
+            if i == 0:  # Skip header
                 continue
             parts = line.strip().split("\t")
             if len(parts) >= 3:
                 cat = parts[2].strip().lower()
-                if cat and cat != "object":  # 过滤掉太泛化的 "object"
+                if cat and cat != "object":  # Filter out overly generic "object"
                     categories.add(cat)
-    categories.add("object")  # 兜底类别
+    categories.add("object")  # Fallback category
     return sorted(list(categories))
 
 
 class CLIPClassifier:
-    """用 CLIP 对 instance 渲染图做零样本分类。"""
+    """Use CLIP for zero-shot classification on instance rendered images."""
     def __init__(self, categories: List[str], device: str = "cuda"):
         self.device = device
         self.categories = categories
@@ -53,13 +54,13 @@ class CLIPClassifier:
         self._initialized = False
 
     def _lazy_init(self):
-        """延迟加载 CLIP，避免没用到时占用显存。"""
+        """Lazy load CLIP to avoid GPU memory usage when not needed."""
         if self._initialized:
             return
         try:
             import clip
             self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
-            # 预计算类别文本特征
+            # Pre-compute category text features
             text_prompts = [f"a photo of a {cat}" for cat in self.categories]
             text_tokens = clip.tokenize(text_prompts).to(self.device)
             with torch.no_grad():
@@ -73,7 +74,7 @@ class CLIPClassifier:
 
     @torch.no_grad()
     def classify(self, image: Image.Image, top_k: int = 1) -> List[Tuple[str, float]]:
-        """对单张图片进行分类，返回 [(类别, 置信度), ...]"""
+        """Classify a single image, return [(category, confidence), ...]"""
         self._lazy_init()
         if not self._initialized or self.model is None:
             return [("unknown", 0.0)]
@@ -92,11 +93,11 @@ class CLIPClassifier:
 
 class SegSplatting:
     """
-    语义高斯训练主流程类（执行顺序）：
-    1) 初始化高斯模型并加载点云；
-    2) 构建稳健语义先验（2D/3D 掩码聚类 + 可见性）；
-    3) 进行语义特征对比学习训练；
-    4) 导出实例信息与带标签点云结果。
+    Semantic Gaussian Training Main Pipeline Class (execution order):
+    1) Initialize Gaussian model and load point cloud;
+    2) Build robust semantic priors (2D/3D mask clustering + visibility);
+    3) Perform semantic feature contrastive learning training;
+    4) Export instance info and labeled point cloud results.
     """
     def __init__(self, modelparams: ModelParams, optimparams: OptimizationParams, pipelineparams: PipelineParams):
         self.modelparams = modelparams
@@ -104,13 +105,13 @@ class SegSplatting:
         self.optimparams = optimparams
         self.pipelineparams = pipelineparams
 
-        # 初始化高斯模型并加载已有点云（不是从零开始重建）
+        # Initialize Gaussian model and load existing point cloud (not rebuilding from scratch)
         self.gaussians = GaussianModel(sh_degree=3)
         self.gaussians.pipelineparams = pipelineparams
         self.gaussians.set_segfeat_params(modelparams)
         self.gaussians.load_ply(os.path.join(self.data_dir, 'point_cloud.ply'))
 
-        # 统一输出目录：output/<scene_parent>/<scene_name>/<model_path>
+        # Unified output directory: output/<scene_parent>/<scene_name>/<model_path>
         self.model_path = os.path.join("output", self.modelparams.source_path.split("/")[-2],
                                        self.modelparams.source_path.split("/")[-1],
                                        self.modelparams.model_path)
@@ -200,8 +201,8 @@ class SegSplatting:
         - instances are stabilized by mask_id anchor ordering
         - tie-breakers pick the smallest uid
         
-        如果 use_clip=True，会对每个 instance 在 best_view 下渲染并用 CLIP 做零样本分类，
-        将类别标签 category_label 和置信度 category_confidence 写入 JSON。
+        If use_clip=True, will render each instance at best_view and use CLIP for zero-shot
+        classification, writing category_label and category_confidence to JSON.
         """
         if not hasattr(self, "scene") or not hasattr(self, "Seg3D_masks") or not hasattr(self, "Seg2D_masks"):
             raise RuntimeError("SegSplatting not initialized: call RobustSemanticPriors() first")
@@ -229,7 +230,7 @@ class SegSplatting:
         best_view_file: List[Optional[str]] = [None] * n_instances
         best_image_name: List[Optional[str]] = [None] * n_instances
 
-        # 遍历每个相机，统计每个 instance 在该视角下的可见点数量，选“最佳视角”
+        # Iterate through each camera, count visible points per instance at each view, select best view
         for cam in cameras:
             vis_file = f"camera_{cam.uid:05d}_visibility.npy"
             vis_path = os.path.join(visibility_dir, vis_file)
@@ -254,17 +255,17 @@ class SegSplatting:
                     best_view_file[idx] = vis_file
                     best_image_name[idx] = getattr(cam, "image_name", None)
 
-        # ========== CLIP 分类器初始化 ==========
+        # ========== CLIP Classifier Initialization ==========
         clip_classifier = None
         if use_clip:
             categories = load_scannet_categories()
             clip_classifier = CLIPClassifier(categories, device="cuda")
 
-        # 准备渲染
+        # Prepare rendering
         bg_color = [1, 1, 1] if self.modelparams.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
-        # 组装稳定顺序的 instance 列表（用于下游优化/可视化）
+        # Assemble stable-ordered instance list (for downstream optimization/visualization)
         instances: List[Dict[str, Any]] = []
         print("🔍 Classifying instances with CLIP..." if use_clip else "📦 Building instance info...")
         
@@ -281,47 +282,47 @@ class SegSplatting:
                 mask_list.append((frame_id, mask_id))
             mask_list.sort()
 
-            # 默认类别
+            # Default category
             category_label = "unknown"
             category_confidence = 0.0
 
-            # ========== CLIP 分类：渲染 instance 在 best_view 下的 masked 图像 ==========
+            # ========== CLIP Classification: render instance masked image at best_view ==========
             if use_clip and clip_classifier is not None and best_uid[instance_id] < np.iinfo(np.int32).max:
                 cam_uid = int(best_uid[instance_id])
                 if cam_uid in uid_to_camera:
                     cam = uid_to_camera[cam_uid]
                     try:
-                        # 渲染该视角下的全图
+                        # Render full image at this view
                         render_pkg = render(cam, self.gaussians, self.pipelineparams, background)
                         rendered_image = render_pkg["render"]  # [3, H, W]
                         
-                        # 获取该 instance 的 2D mask（从 sorted_segmap）
+                        # Get 2D mask for this instance (from sorted_segmap)
                         if hasattr(cam, "sorted_segmap") and cam.sorted_segmap is not None:
                             segmap = cam.sorted_segmap.squeeze()
                             if isinstance(segmap, torch.Tensor):
                                 segmap = segmap.cpu().numpy()
-                            instance_mask = (segmap == (instance_id + 1))  # sorted_segmap 是 1-indexed
+                            instance_mask = (segmap == (instance_id + 1))  # sorted_segmap is 1-indexed
                         else:
-                            # fallback: 用全图
+                            # fallback: use full image
                             instance_mask = np.ones((rendered_image.shape[1], rendered_image.shape[2]), dtype=bool)
                         
-                        # 对渲染图应用 mask，裁剪出 instance 区域
+                        # Apply mask to rendered image, crop out instance region
                         rendered_np = rendered_image.permute(1, 2, 0).cpu().numpy()  # [H, W, 3]
                         rendered_np = (rendered_np * 255).clip(0, 255).astype(np.uint8)
                         
-                        # 找到 mask 的 bounding box
+                        # Find bounding box of mask
                         ys, xs = np.where(instance_mask)
                         if len(ys) > 0 and len(xs) > 0:
                             y_min, y_max = ys.min(), ys.max()
                             x_min, x_max = xs.min(), xs.max()
-                            # 稍微扩展边界
+                            # Slightly expand boundaries
                             pad = 10
                             y_min = max(0, y_min - pad)
                             y_max = min(rendered_np.shape[0], y_max + pad)
                             x_min = max(0, x_min - pad)
                             x_max = min(rendered_np.shape[1], x_max + pad)
                             
-                            # 裁剪
+                            # Crop
                             cropped = rendered_np[y_min:y_max, x_min:x_max]
                             if cropped.size > 0:
                                 pil_image = Image.fromarray(cropped)
@@ -355,7 +356,7 @@ class SegSplatting:
 
     @torch.no_grad()
     def RobustSemanticPriors(self):
-        """构建稳健语义先验：聚类 -> 排序/过滤 -> 3D 标签 -> 可见性。"""
+        """Build robust semantic priors: clustering -> sorting/filtering -> 3D labels -> visibility."""
         print("\033[91mRunning Mask Clustering with Spatial Gaussian Tracker... \033[0m")
 
         if os.path.exists(self.modelparams.preload_robust_semantic):
@@ -368,7 +369,7 @@ class SegSplatting:
         viewpoint_stack = self._sorted_viewpoints(scene.getTrainCameras().copy())
         self.gausclustering = GausCluster(self.gaussians, viewpoint_stack)
 
-        # 第一次运行时执行聚类；如果已有 output_dict.npy 则直接复用缓存
+        # Execute clustering on first run; if output_dict.npy exists, reuse cache
         if not os.path.exists(os.path.join(segment_save_dir, "output_dict.npy")):
             sam_dir = os.path.join(self.data_dir, "sam/mask_filtered")
             if os.path.exists(sam_dir):
@@ -379,30 +380,30 @@ class SegSplatting:
             os.path.join(segment_save_dir, "output_dict.npy"), allow_pickle=True
         ).item()
 
-        # 固定 instance 顺序，避免跨机器/多次运行编号漂移
+        # Fix instance order to avoid ID drift across machines/runs
         self.robust_semantic_priors = self._stabilize_instance_order(self.robust_semantic_priors)
 
         self.Seg3D_masks = self.robust_semantic_priors["mask_3d_labels"]
-        # 每个 3D 点对应一个 instance id（argmax）
+        # Each 3D point corresponds to one instance id (argmax)
         self.Seg3D_labels = torch.argmax(torch.tensor(self.Seg3D_masks, dtype=torch.int16), dim=1).cuda()
 
         self.Seg2D_masks = self.robust_semantic_priors["mask_2d_clusters"]
-        # 根据稳定后的聚类结果重排 2D mask 文件（保证索引一致）
+        # Rearrange 2D mask files based on stabilized clustering results (ensure index consistency)
         if not os.path.exists(os.path.join(self.data_dir, "sam/mask_sorted")):
             self.gausclustering.rearrange_mask(os.path.join(self.data_dir, "sam/mask"), self.Seg2D_masks)
 
         self.undersegment_masks = self.robust_semantic_priors["underseg_mask_ids"]
-        # 过滤过分割掩码，减少噪声 supervision
+        # Filter over-segmented masks to reduce noisy supervision
         if not os.path.exists(os.path.join(self.data_dir, "sam/mask_filtered")):
             self.gausclustering.filter_undersegment_mask(os.path.join(self.data_dir, "sam/mask"),
                                                          self.undersegment_masks)
 
         self.scene = Scene(self.modelparams, self.gaussians, loaded_gaussian=True)
 
-        # 将 3D instance 先验写入高斯特征，用于后续 2D/3D 对比学习
+        # Write 3D instance priors to Gaussian features for subsequent 2D/3D contrastive learning
         self.gaussians.set_3d_feat(self.Seg3D_masks, gram_feat=self.optimparams.gram_feat_3d)
 
-        # 预计算每个相机可见点，供后续 best-view 与导出使用
+        # Pre-compute visible points per camera for subsequent best-view and export
         self.find_visible_points()
         # instance_info.json will be exported in export_segment_results_final()
 
@@ -421,7 +422,7 @@ class SegSplatting:
         bg_color = [1, 1, 1] if self.modelparams.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
-        # 按相机逐帧计算“哪些高斯点在该视角前景可见”
+        # Compute per-camera which Gaussian points are visible in foreground at this view
         for camera_idx, camera in enumerate(tqdm(viewpoints, desc="Processing cameras")):
             try:
                 point_cloud = self.gaussians.get_xyz.detach().cuda()
@@ -435,7 +436,7 @@ class SegSplatting:
                 points_cam = (world_view_transform @ points_h).T
                 depths = points_cam[:, 2]
                 
-                # 先按深度排序，后续每个像素只保留最前面的高斯点
+                # Sort by depth first, later keep only frontmost Gaussian point per pixel
                 depth_sort_indices = torch.argsort(depths)
                 sorted_to_original = depth_sort_indices.clone()
                 original_to_sorted = torch.empty_like(depth_sort_indices)
@@ -467,7 +468,7 @@ class SegSplatting:
                         max_pixel_idx = pixel_indices_sorted.max().item() + 1
                         first_occurrence_gauss = torch.full((max_pixel_idx,), total_points, dtype=torch.long, device='cuda')
                         
-                        # 对每个像素取最小（最前）sorted-gauss-index
+                        # For each pixel, take minimum (frontmost) sorted-gauss-index
                         first_occurrence_gauss.scatter_reduce_(0, pixel_indices_sorted, gauss_indices_sorted, 'amin', include_self=True)
                         
                         valid_pixels_mask = first_occurrence_gauss < total_points
@@ -482,7 +483,7 @@ class SegSplatting:
                         else:
                             visibility_mask = torch.zeros(total_points, dtype=torch.bool, device='cuda')
 
-                # 将该相机的可见性布尔向量落盘
+                # Save visibility boolean vector for this camera to disk
                 visibility_filename = f"camera_{camera.uid:05d}_visibility.npy"
                 visibility_filepath = os.path.join(visibility_save_dir, visibility_filename)
                 
@@ -510,7 +511,7 @@ class SegSplatting:
         with open(os.path.join(visibility_save_dir, "camera_order.json"), 'w') as f:
             json.dump(camera_order_info, f, indent=2)
         
-        # 保存可见性统计摘要，便于调试和复现实验
+        # Save visibility statistics summary for debugging and experiment reproduction
         summary_info = {
             'total_cameras': int(total_cameras),
             'total_points': int(total_points),
@@ -526,7 +527,7 @@ class SegSplatting:
     
         # Train segment feature
     def train_segfeat(self):
-        """语义特征训练主循环：单视角对比 + 多视角对比 + 3D 对比。"""
+        """Semantic feature training main loop: single-view contrast + multi-view contrast + 3D contrast."""
         print("\n\033[91mRunning Spatial Contrastive Learning... \033[0m")
 
         if os.path.exists(
@@ -546,7 +547,7 @@ class SegSplatting:
         progress_bar = tqdm(range(first_iter, self.optimparams.iterations), desc="Training progress")
         first_iter += 1
 
-        # 迭代训练：每轮随机取一个视角进行渲染与对比监督
+        # Iterative training: randomly pick one view per iteration for rendering and contrastive supervision
         for iteration in range(first_iter, self.optimparams.iterations + 1):
             iter_start.record()
 
@@ -560,7 +561,7 @@ class SegSplatting:
                 render_pkg["render"], render_pkg["seg_feature"], render_pkg["viewspace_points"], \
                     render_pkg["visibility_filter"], render_pkg["radii"]
 
-            # 1) 单视角对比损失（segmap + 可选 sorted_segmap）
+            # 1) Single-view contrastive loss (segmap + optional sorted_segmap)
             singleview_contra_loss = 0
             mask_type_cnts = 0
             if self.gaussians.class_feat is not None:
@@ -593,7 +594,7 @@ class SegSplatting:
                     print("Invalid View: ", viewpoint_cam.image_name)
                 mask_type_cnts += 1
 
-            # 2) 多视角对比损失（每 10 轮触发一次）
+            # 2) Multi-view contrastive loss (triggered every 10 iterations)
             multiview_contra_loss = 0
             if self.optimparams.lambda_multiview_contras > 0 and iteration % 10 == 0:
                 num_sample_views = self.optimparams.sample_mv_frames
@@ -626,7 +627,7 @@ class SegSplatting:
             visibility_segfeat = self.gaussians.get_seg_feature[visibility_filter]
             visibility_labels_3d = self.Seg3D_labels[visibility_filter]
 
-            # 3) 3D 对比损失（只在当前视角可见点上采样）
+            # 3) 3D contrastive loss (sample only from visible points at current view)
             contra_3d_loss = 0
             if self.optimparams.lambda_3D_contras > 0:
                 batchsize_3d = self.optimparams.sample_batchsize
@@ -647,7 +648,7 @@ class SegSplatting:
                 else:
                     print("Invalid View: ", viewpoint_cam.image_name)
 
-            # 总损失反传并更新高斯语义特征
+            # Backpropagate total loss and update Gaussian semantic features
             total_loss = singleview_contra_loss + \
                          multiview_contra_loss + \
                          contra_3d_loss
@@ -678,7 +679,7 @@ class SegSplatting:
                     os.makedirs(self.scene.model_path, exist_ok=True)
                     Image.fromarray(feature_to_rgb(seg_feature)).save(f"{self.scene.model_path}/{iteration}_feat.png")
 
-                # 固定间隔保存；最后一次会导出最终标签点云与 instance_info.json
+                # Save at fixed intervals; final iteration exports labeled point cloud and instance_info.json
                 if iteration % 2500 == 0:
                     self.scene.save(iteration)
                     if iteration == self.optimparams.iterations:
@@ -697,7 +698,7 @@ class SegSplatting:
         os.makedirs(save_dir, exist_ok=True)
         save_partial_dir = os.path.join(save_dir, "label_pointclouds")
         os.makedirs(save_partial_dir, exist_ok=True)
-        # 新增：instance 图像保存目录
+        # New: instance image save directory
         save_images_dir = os.path.join(save_dir, "instance_images")
         os.makedirs(save_images_dir, exist_ok=True)
 
@@ -718,7 +719,7 @@ class SegSplatting:
         all_assigned_points = torch.zeros(total_points, dtype=torch.bool)
         
         
-        # 逐 instance 计算特征相似度，得到点级标签分配
+        # Compute feature similarity per instance to get point-level label assignment
         for sampled_3d_labels in range(self.Seg3D_masks.shape[1]):
             selected_pseudo_3d_feat = self.gaussians.get_seg_feature[self.Seg3D_masks[:, sampled_3d_labels]]
             selected_pseudo_3d_feat_mean = selected_pseudo_3d_feat.mean(0).cpu()
@@ -746,7 +747,7 @@ class SegSplatting:
 
         instance_colors = self._deterministic_semantic_colors(num_instances)
         
-        # 写出全量彩色点云 + 标签数组 + 每个实例单独点云
+        # Write full colored point cloud + label array + separate point cloud for each instance
         full_pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(scene_pclds))
         colors = np.zeros((total_points, 3))
         
@@ -780,15 +781,15 @@ class SegSplatting:
             unassigned_pcld.paint_uniform_color([1.0, 1.0, 1.0])
             o3d.io.write_point_cloud(os.path.join(save_partial_dir, "unassigned.ply"), unassigned_pcld)
 
-        # ========== 保存每个 instance 的 best view 图像 ==========
+        # ========== Save best view images for each instance ==========
         self._export_instance_images(save_dir, save_images_dir, num_instances)
 
     @torch.no_grad()
     def _export_instance_images(self, save_dir: str, save_images_dir: str, num_instances: int):
-        """为每个 instance 保存 best view 原图和带 mask 蒙版的图像。"""
+        """Save best view original image and masked image for each instance."""
         print("🖼️ Exporting instance images...")
         
-        # 读取 instance_info.json 获取 best_view 信息
+        # Read instance_info.json to get best_view info
         instance_info_path = os.path.join(save_dir, "instance_info.json")
         if not os.path.exists(instance_info_path):
             print("⚠️ instance_info.json not found, skipping instance image export")
@@ -801,15 +802,15 @@ class SegSplatting:
         if not instances:
             return
         
-        # 构建 uid -> camera 映射
+        # Build uid -> camera mapping
         cameras = self._sorted_viewpoints(self.scene.getTrainCameras())
         uid_to_camera = {cam.uid: cam for cam in cameras}
         
-        # 准备渲染
+        # Prepare rendering
         bg_color = [1, 1, 1] if self.modelparams.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
         
-        # 缓存已渲染的相机图像，避免重复渲染
+        # Cache rendered camera images to avoid redundant rendering
         rendered_cache = {}
         
         for inst in tqdm(instances, desc="Exporting instance images"):
@@ -822,7 +823,7 @@ class SegSplatting:
             
             cam = uid_to_camera[best_view_uid]
             
-            # 渲染或从缓存获取
+            # Render or get from cache
             if best_view_uid not in rendered_cache:
                 render_pkg = render(cam, self.gaussians, self.pipelineparams, background)
                 rendered_image = render_pkg["render"]  # [3, H, W]
@@ -832,49 +833,49 @@ class SegSplatting:
             else:
                 rendered_np = rendered_cache[best_view_uid]
             
-            # 获取该 instance 的 2D mask
+            # Get 2D mask for this instance
             if hasattr(cam, "sorted_segmap") and cam.sorted_segmap is not None:
                 segmap = cam.sorted_segmap.squeeze()
                 if isinstance(segmap, torch.Tensor):
                     segmap = segmap.cpu().numpy()
-                instance_mask = (segmap == (instance_id + 1))  # sorted_segmap 是 1-indexed
+                instance_mask = (segmap == (instance_id + 1))  # sorted_segmap is 1-indexed
             else:
-                # fallback: 无 mask 则跳过
+                # fallback: skip if no mask
                 continue
             
-            # 找到 mask 的 bounding box
+            # Find bounding box of mask
             ys, xs = np.where(instance_mask)
             if len(ys) == 0 or len(xs) == 0:
                 continue
             
             y_min, y_max = ys.min(), ys.max()
             x_min, x_max = xs.min(), xs.max()
-            # 稍微扩展边界
+            # Slightly expand boundaries
             pad = 15
             y_min = max(0, y_min - pad)
             y_max = min(rendered_np.shape[0], y_max + pad)
             x_min = max(0, x_min - pad)
             x_max = min(rendered_np.shape[1], x_max + pad)
             
-            # 1) 保存 best view 原图（裁剪后）
+            # 1) Save best view original image (cropped)
             cropped = rendered_np[y_min:y_max, x_min:x_max].copy()
             if cropped.size > 0:
                 cropped_pil = Image.fromarray(cropped)
                 cropped_pil.save(os.path.join(save_images_dir, f"{instance_id}_bestview.png"))
             
-            # 2) 保存带 mask 蒙版的图像（instance 区域保留，其他区域变暗）
-            # 创建全图的 masked 版本
+            # 2) Save masked image (instance region preserved, other regions darkened)
+            # Create masked version of full image
             masked_full = rendered_np.copy()
-            # 将非 instance 区域变暗（乘以 0.3）
+            # Darken non-instance regions (multiply by 0.3)
             mask_3d = np.stack([instance_mask] * 3, axis=-1)
             masked_full = np.where(mask_3d, masked_full, (masked_full * 0.3).astype(np.uint8))
-            # 裁剪
+            # Crop
             masked_cropped = masked_full[y_min:y_max, x_min:x_max]
             if masked_cropped.size > 0:
                 masked_pil = Image.fromarray(masked_cropped)
                 masked_pil.save(os.path.join(save_images_dir, f"{instance_id}_masked.png"))
             
-            # 3) 额外保存：只有 instance 区域的图像（其他区域透明，RGBA）
+            # 3) Extra save: image with only instance region (other regions transparent, RGBA)
             cropped_mask = instance_mask[y_min:y_max, x_min:x_max]
             if cropped.size > 0:
                 rgba = np.zeros((cropped.shape[0], cropped.shape[1], 4), dtype=np.uint8)
@@ -883,7 +884,7 @@ class SegSplatting:
                 rgba_pil = Image.fromarray(rgba, mode="RGBA")
                 rgba_pil.save(os.path.join(save_images_dir, f"{instance_id}_isolated.png"))
         
-        # 清理缓存
+        # Clear cache
         rendered_cache.clear()
         torch.cuda.empty_cache()
         print(f"✅ Instance images saved to: {save_images_dir}")
@@ -923,20 +924,20 @@ class SegSplatting:
 
 
 if __name__ == "__main__":
-    # ---------------- 程序入口 ----------------
-    # 1) 解析参数
+    # ---------------- Program Entry Point ----------------
+    # 1) Parse arguments
     parser = ArgumentParser(description="Training script parameters")
     lp = ModelParams(parser)
     op = OptimizationParams(parser)
     pp = PipelineParams(parser)
     args = parser.parse_args(sys.argv[1:])
 
-    # 2) 初始化训练器
+    # 2) Initialize trainer
     segsplat = SegSplatting(lp.extract(args), op.extract(args), pp.extract(args))
     segsplat.args = args
-    # 3) 构建稳健语义先验（含可见性）
+    # 3) Build robust semantic priors (including visibility)
     segsplat.RobustSemanticPriors()
-    # 4) 训练语义特征并在最后导出结果
+    # 4) Train semantic features and export results at the end
     segsplat.train_segfeat()
     
     print("\nTraining complete.")

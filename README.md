@@ -147,6 +147,7 @@ python train_semantic.py -s data/scene0000_00 \
 ```
 - It's normal to get stuck at the `DBScan Filter Stage`, since the backgrount gaussian points may be divided into multi-regions.
 - Use `--consider_negative_labels` to suppress floaters during background segmentation.
+- The generated instance labels are not accurate and just for reference, which would be further determined by the VLM in the SGS module.
 
 ### 2. Optimize best view by AVO
 
@@ -157,6 +158,7 @@ python optimize_by_avo.py --source_path data/scene0000_00 --label_dir output/dat
 - Before optimization, you can view the point cloud of each object under output/data/scene0000_00/train_semanticgs/point_cloud/iteration_2500/label_pointclouds.
 - For situations where AVO results are not ideal, please adjust some hyperparameters, such as learning rates for rotation and translation, depth constraint coefficients, etc. The number of optimization rounds can also be adjusted up to 5000 rounds.
 - For cases where optimization fails due to artifact drift in the 2dgs output point cloud, check out some recent works dedicated to solving such problems.
+- The generated instance labels are not accurate and just for reference, which would be further determined by the VLM in the SGS module.
 
 ### 3. Generate 3D assets
 Users can generate 3D assets by leveraging the optimized best views.
