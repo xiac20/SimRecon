@@ -161,7 +161,7 @@ python optimize_by_avo.py --source_path data/scene0000_00 --label_dir output/dat
 - The generated instance labels are not accurate and just for reference, which would be further determined by the VLM in the SGS module.
 
 ### 3. Generate 3D assets
-Users can generate 3D assets by leveraging the optimized best views.
+Users can generate 3D assets by leveraging the optimized best views. For our pipeline we utilized the Rodin model. Users can proceed to their [official website](https://hyper3d.ai/) to generate the assets directly. We also highly recommend using available open-source Image-to-3D models such as [SAM3D](https://github.com/facebookresearch/sam-3d-objects) or [Trellis](https://github.com/microsoft/TRELLIS) to achieve similar results and reproduce the pipeline.
 
 ### 4. Generate instance projected frames
 ```bash
@@ -180,7 +180,9 @@ python infer_scene_graph.py  --instance_project_dir output/data/scene0000_00/tra
 ```bash
 python merge_scene_graphs.py --scene_graphs_dir output/data/scene0000_00/train_semanticgs/point_cloud/iteration_2500/scene_graphs
 ```
-- Users can subsequently leverage the inferred scene graphs to ascertain relative object relationships within the simulator and activate the simulation to obtain final physically plausible scenes.
+- Users can subsequently leverage the inferred scene graphs to ascertain relative object relationships.
+- For spatial placement and coordinate alignment users can compute a basic bounding box from the instance 3DGS to estimate the center position and size. Users can then apply [FoundationPose](https://github.com/NVlabs/FoundationPose) to estimate the orientation by aligning the 3D asset with its best view. This algorithmic step is relatively straightforward so users can easily implement this part themselves based on their chosen assets.
+- Regarding the final placement within the simulator users can input the assets manually based on their related parameters. The placement follows the layer-by-layer physical simulation activation procedure detailed in our paper to obtain the final physically plausible scenes.
 
 
 ## 🔗Acknowledgement
