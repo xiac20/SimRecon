@@ -14,7 +14,7 @@ Zizhuo Wang<sup>1</sup>,
 <sup>2</sup>Galbot
 </p>
 
-<h3 align="center">CVPR 2026 🔥</h3>
+<h3 align="center">CVPR 2026 (Highlight)🔥</h3>
 
 <a href="https://arxiv.org/abs/2603.02133"><img src='https://img.shields.io/badge/arXiv-2603.02133-b31b1b.svg'></a> &nbsp;&nbsp;&nbsp;&nbsp;
 <a href="https://xiac20.github.io/SimRecon"><img src='https://img.shields.io/badge/Project-Page-Green'></a> &nbsp;&nbsp;&nbsp;&nbsp;
