@@ -26,6 +26,7 @@ Zizhuo Wang<sup>1</sup>,
 **SimRecon:** We propose SimRecon,a novel compositional scene reconstruction framework that implements a "Perception-Generation-Simulation" pipeline with specialized bridging modules to ensure high visual fidelity and physical plausibility.
 
 ## 📢 News
+- 🔥 [04/14/2026] ReplicateAnyScene: Our robust, zero-shot follow-up work is now available. See the [project page](https://xiac20.github.io/ReplicateAnyScene/).
 - 🔥 [03/18/2026] We release the code of our Scene Graph Synthesizer (SGS) module, making our entire codebase fully open-sourced.
 - 🔥 [03/18/2026] To accommodate diverse choices in 3D asset generation models and physical simulators, we leave their specific implementations open for user customization.
 - 🔥 [03/03/2026] We release the code of our Active Viewpoint Optimization (AVO) module. 
