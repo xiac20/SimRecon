@@ -18,6 +18,12 @@ cxx_compiler_flags = []
 if os.name == 'nt':
     cxx_compiler_flags.append("/wd4624")
 
+_warn_suppress = []
+_nvcc_warn = []
+if os.name != 'nt':
+    _warn_suppress = ["-Wno-deprecated-declarations"]
+    _nvcc_warn = ["-Xcompiler=-Wno-deprecated-declarations"]
+
 setup(
     name="simple_knn",
     ext_modules=[
@@ -27,7 +33,10 @@ setup(
             "spatial.cu", 
             "simple_knn.cu",
             "ext.cpp"],
-            extra_compile_args={"nvcc": [], "cxx": cxx_compiler_flags})
+            extra_compile_args={
+                "nvcc": _nvcc_warn,
+                "cxx": _warn_suppress + cxx_compiler_flags,
+            })
         ],
     cmdclass={
         'build_ext': BuildExtension

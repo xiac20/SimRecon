@@ -11,6 +11,7 @@
 
 import torch
 import numpy as np
+import platform
 from utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
 from torch import nn
 import os
@@ -27,6 +28,60 @@ from scipy.spatial.transform import Rotation
 from e3nn import o3
 import einops
 import einsum
+
+
+def _should_export_open3d_auxiliary_plys() -> bool:
+    """主 PLY 已由 plyfile 寫入；*_color.ply / *_feat.ply 僅供視覺化。部分 aarch64 Open3D 會在
+    Vector3dVector / write_point_cloud 路徑 SIGSEGV，預設在 arm64 上跳過。"""
+    v = os.environ.get("SIMRECON_OPEN3D_AUX_PLY", "").strip().lower()
+    if v in ("1", "true", "yes"):
+        return True
+    if v in ("0", "false", "no"):
+        return False
+    return platform.machine() not in ("aarch64", "arm64")
+
+
+def _write_open3d_auxiliary_plys(path: str, xyz: np.ndarray, f_dc: np.ndarray, seg_feat: np.ndarray | None) -> None:
+    if not _should_export_open3d_auxiliary_plys():
+        return
+    try:
+        o3d_pointcloud = o3d.geometry.PointCloud()
+        o3d_pointcloud.points = o3d.utility.Vector3dVector(xyz)
+        o3d_pointcloud.colors = o3d.utility.Vector3dVector(SH2RGB(f_dc).clip(0.0, 1.0))
+        o3d.io.write_point_cloud(path.split(".")[0] + "_color.ply", o3d_pointcloud)
+        if seg_feat is not None:
+            o3d_pointcloud.colors = o3d.utility.Vector3dVector(feature3d_to_rgb(seg_feat))
+            o3d.io.write_point_cloud(path.split(".")[0] + "_feat.ply", o3d_pointcloud)
+    except Exception as e:
+        print(f"⚠️ Open3D auxiliary PLY export skipped/failed ({e}); main PLY is already saved.")
+
+
+def _write_xyz_rgb_ply(path: str, xyz: np.ndarray, colors: np.ndarray) -> None:
+    """以 plyfile 寫入帶 uchar 頂點色的 PLY（避開 Open3D IO）。colors: (N,3) float [0,1]。"""
+    xyz = np.asarray(xyz, dtype=np.float32)
+    colors = np.clip(np.asarray(colors, dtype=np.float64), 0.0, 1.0)
+    rgb = (colors * 255.0 + 0.5).astype(np.uint8)
+    n = int(xyz.shape[0])
+    if n == 0:
+        return
+    verts = np.empty(
+        n,
+        dtype=[
+            ("x", "f4"),
+            ("y", "f4"),
+            ("z", "f4"),
+            ("red", "u1"),
+            ("green", "u1"),
+            ("blue", "u1"),
+        ],
+    )
+    verts["x"] = xyz[:, 0]
+    verts["y"] = xyz[:, 1]
+    verts["z"] = xyz[:, 2]
+    verts["red"] = rgb[:, 0]
+    verts["green"] = rgb[:, 1]
+    verts["blue"] = rgb[:, 2]
+    PlyData([PlyElement.describe(verts, "vertex")]).write(path)
 
 
 class GaussianModel:
@@ -379,13 +434,8 @@ class GaussianModel:
         el = PlyElement.describe(elements, 'vertex')
         PlyData([el]).write(path)
 
-        o3d_pointcloud = o3d.geometry.PointCloud()
-        o3d_pointcloud.points = o3d.utility.Vector3dVector(xyz)
-        o3d_pointcloud.colors = o3d.utility.Vector3dVector(SH2RGB(f_dc).clip(0., 1.))
-        o3d.io.write_point_cloud(path.split(".")[0] + "_color.ply", o3d_pointcloud)
-        if self._seg_feature is not None:
-            o3d_pointcloud.colors = o3d.utility.Vector3dVector(feature3d_to_rgb(seg_feat))
-            o3d.io.write_point_cloud(path.split(".")[0] + "_feat.ply", o3d_pointcloud)
+        seg_feat_arg = seg_feat if self._seg_feature is not None else None
+        _write_open3d_auxiliary_plys(path, xyz, f_dc, seg_feat_arg)
 
     def save_ply_as_3dgs(self, path):
         """
@@ -418,13 +468,8 @@ class GaussianModel:
         el = PlyElement.describe(elements, 'vertex')
         PlyData([el]).write(path)
 
-        o3d_pointcloud = o3d.geometry.PointCloud()
-        o3d_pointcloud.points = o3d.utility.Vector3dVector(xyz)
-        o3d_pointcloud.colors = o3d.utility.Vector3dVector(SH2RGB(f_dc).clip(0., 1.))
-        o3d.io.write_point_cloud(path.split(".")[0] + "_color.ply", o3d_pointcloud)
-        if self._seg_feature is not None:
-            o3d_pointcloud.colors = o3d.utility.Vector3dVector(feature3d_to_rgb(seg_feat))
-            o3d.io.write_point_cloud(path.split(".")[0] + "_feat.ply", o3d_pointcloud)
+        seg_feat_arg = seg_feat if self._seg_feature is not None else None
+        _write_open3d_auxiliary_plys(path, xyz, f_dc, seg_feat_arg)
 
     def reset_opacity(self):
         """

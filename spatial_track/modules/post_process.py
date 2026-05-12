@@ -1,9 +1,8 @@
 import numpy as np
-
-import numpy as np
 import os
 import torch
 from tqdm import tqdm
+from sklearn.cluster import DBSCAN
 
 
 def judge_bbox_overlay(bbox_1, bbox_2):
@@ -69,10 +68,10 @@ def merge_overlapping_objects(total_point_ids_list, total_bbox_list, total_mask_
     return valid_point_ids_list, valid_pcld_mask_list, invalid_object
 
 
-def filter_point(point_frame_matrix, node, pcld_list, point_ids_list, mask_point_clouds, args):
+def filter_point(point_frame_matrix, node, scene_points, point_ids_list, mask_point_clouds, args):
     '''
         点过滤（参考 OVIR-3D）：
-        - 对每个DBSCAN分割得到的子对象（pcld_list/point_ids_list），计算点的检测比率：
+        - 对每个DBSCAN分割得到的子对象（point_ids_list），计算点的检测比率：
           检测比率 = 该点在该节点（cluster）出现的帧数 / 该点在全视频出现的帧数
         - 若检测比率 > 阈值（args.point_filter_threshold），则保留；否则过滤
         - 同时统计每个mask在其隶属对象中的覆盖率，用于后续（如OpenMask3D）
@@ -80,7 +79,7 @@ def filter_point(point_frame_matrix, node, pcld_list, point_ids_list, mask_point
         参数：
         - point_frame_matrix: (N_pts, N_frames) 布尔矩阵，点在帧中是否出现
         - node: 当前聚类节点（包含 mask_list 与 visible_frame）
-        - pcld_list: List[o3d.geometry.PointCloud]，DBSCAN分割出的子点云
+        - scene_points: (N_points, 3) 全局坐标，用于子对象 AABB
         - point_ids_list: List[np.ndarray]，对应子点云的点ID列表
         - mask_point_clouds: {f"frameId_maskId": set(point_ids)}，每个掩码的点集合
         - args: 聚类与过滤阈值，其中 point_filter_threshold 使用
@@ -161,41 +160,43 @@ def filter_point(point_frame_matrix, node, pcld_list, point_ids_list, mask_point
         if len(valid_point_ids) == 0 or len(object_mask_list[i]) < 2:
             continue
         filtered_point_ids.append(point_ids_list[i][valid_point_ids])
-        filtered_bbox_list.append([np.amin(pcld_list[i].points, axis=0), np.amax(pcld_list[i].points, axis=0)])
+        pid = point_ids_list[i][valid_point_ids]
+        coords = scene_points[pid]
+        filtered_bbox_list.append([np.amin(coords, axis=0), np.amax(coords, axis=0)])
         filtered_mask_list.append(object_mask_list[i])
     return filtered_point_ids, filtered_bbox_list, filtered_mask_list
 
 
-def dbscan_process(pcld, point_ids, DBSCAN_THRESHOLD=0.1, min_points=4):
+def dbscan_process(points, point_ids, DBSCAN_THRESHOLD=0.1, min_points=4):
     '''
     使用 DBSCAN 将不连通的点云拆分为多个对象（参考 OVIR-3D）。
+    全程 numpy + sklearn，避免 Open3D 在 aarch64 上 SIGSEGV。
 
     参数：
-    - pcld: o3d.geometry.PointCloud 当前节点的点云
-    - point_ids: 对应全局点的ID
+    - points: (K, 3) 点坐标
+    - point_ids: (K,) 与 points 行对应的全局点 ID
     - DBSCAN_THRESHOLD: eps半径
     - min_points: 最小点数阈值
 
     返回：
-    - pcld_list: 拆分后的子点云列表
-    - point_ids_list: 对应子点云的点ID数组列表
+    - point_ids_list: 每个子簇的全局点 ID 数组列表
     '''
-    # TODO: 可以考虑融合CLIP特征提升一致性
-    labels = np.array(pcld.cluster_dbscan(eps=DBSCAN_THRESHOLD, min_points=min_points)) + 1  # -1为噪声
+    pts = np.ascontiguousarray(np.asarray(points, dtype=np.float64))
+    pcld_ids_list = np.asarray(point_ids)
+    if pts.shape[0] == 0:
+        return []
+
+    clustering = DBSCAN(eps=DBSCAN_THRESHOLD, min_samples=min_points, n_jobs=1).fit(pts)
+    labels = clustering.labels_.astype(np.int64) + 1
     count = np.bincount(labels)
 
-    # 将不连通的点云拆分成多个对象
-    pcld_list, point_ids_list = [], []
-    pcld_ids_list = np.array(point_ids)
+    point_ids_list = []
     for i in range(len(count)):
         remain_index = np.where(labels == i)[0]
         if len(remain_index) == 0:
             continue
-        new_pcld = pcld.select_by_index(remain_index)
-        point_ids = pcld_ids_list[remain_index]
-        pcld_list.append(new_pcld)
-        point_ids_list.append(point_ids)
-    return pcld_list, point_ids_list
+        point_ids_list.append(pcld_ids_list[remain_index])
+    return point_ids_list
 
 
 def find_represent_mask(mask_info_list):
@@ -292,13 +293,13 @@ def post_process(gaussian, mask_assocation, clustering_args):
     for node in iterator:
         if len(node.mask_list) < 2:  # objects merged from less than 2 masks are ignored
             continue
-        pcld, point_ids = node.get_point_cloud(scene_points)
+        points_np, point_ids = node.get_point_cloud(scene_points)
         if True:
-            pcld_list, point_ids_list = dbscan_process(pcld, point_ids, DBSCAN_THRESHOLD=0.1,
-                                                       min_points=4)  # split the disconnected point cloud into different objects
+            point_ids_list = dbscan_process(points_np, point_ids, DBSCAN_THRESHOLD=0.1,
+                                            min_points=4)
         else:
-            pcld_list, point_ids_list = [pcld], [np.array(point_ids)]
-        point_ids_list, bbox_list, mask_list = filter_point(gaussian_in_frame_matrix, node, pcld_list,
+            point_ids_list = [np.asarray(point_ids)]
+        point_ids_list, bbox_list, mask_list = filter_point(gaussian_in_frame_matrix, node, scene_points,
                                                             point_ids_list,
                                                             mask_gaussian_pclds,
                                                             clustering_args)

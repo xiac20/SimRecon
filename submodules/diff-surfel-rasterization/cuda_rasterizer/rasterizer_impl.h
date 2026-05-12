@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <iostream>
 #include <vector>
 #include "rasterizer.h"
@@ -37,8 +38,8 @@ namespace CudaRasterizer
 		float* transMat;
 		float4* normal_opacity;
 		float* rgb;
-		uint32_t* point_offsets;
-		uint32_t* tiles_touched;
+		std::uint32_t* point_offsets;
+		std::uint32_t* tiles_touched;
 
 		static GeometryState fromChunk(char*& chunk, size_t P);
 	};
@@ -46,7 +47,7 @@ namespace CudaRasterizer
 	struct ImageState
 	{
 		uint2* ranges;
-		uint32_t* n_contrib;
+		std::uint32_t* n_contrib;
 		float* accum_alpha;
 
 		static ImageState fromChunk(char*& chunk, size_t N);
@@ -55,10 +56,10 @@ namespace CudaRasterizer
 	struct BinningState
 	{
 		size_t sorting_size;
-		uint64_t* point_list_keys_unsorted;
-		uint64_t* point_list_keys;
-		uint32_t* point_list_unsorted;
-		uint32_t* point_list;
+		std::uint64_t* point_list_keys_unsorted;
+		std::uint64_t* point_list_keys;
+		std::uint32_t* point_list_unsorted;
+		std::uint32_t* point_list;
 		char* list_sorting_space;
 
 		static BinningState fromChunk(char*& chunk, size_t P);

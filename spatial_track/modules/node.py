@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import open3d as o3d
 
@@ -55,17 +56,15 @@ class Node:
     
     def get_point_cloud(self, scene_points):
         '''
-            将当前节点对应的3D点坐标提取为Open3D点云对象，便于可视化与后处理。
+            将当前节点对应的3D点坐标提取为 numpy（避免 linux-aarch64 上 Open3D Vector3dVector / select_by_index SIGSEGV）。
 
             参数：
             - scene_points: (N_points, 3) 的全局点坐标数组（与 point_ids 对应）
 
             返回：
-            - pcld: open3d.geometry.PointCloud 对象（只包含该节点的点）
-            - point_ids: list[int] 该节点对应的3D点ID列表
+            - points: (K, 3) float64 C-contiguous
+            - point_ids: (K,) int64，与 points 行一一对应
         '''
-        point_ids = list(self.point_ids)
-        points = scene_points[point_ids]
-        pcld = o3d.geometry.PointCloud()
-        pcld.points = o3d.utility.Vector3dVector(points)
-        return pcld, point_ids
+        point_ids = np.array(list(self.point_ids), dtype=np.int64)
+        points = np.ascontiguousarray(np.asarray(scene_points[point_ids], dtype=np.float64))
+        return points, point_ids

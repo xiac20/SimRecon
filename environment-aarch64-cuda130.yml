@@ -1,0 +1,22 @@
+# SimRecon：Linux aarch64（如 NVIDIA GB10 / Spark）+ 驅動內建 CUDA 13 環境
+# 與 PyTorch cu130 manylinux_2_28_aarch64 預編譯輪子對齊（需 conda-forge / Miniforge）。
+#
+#   conda env create -f environment-aarch64-cuda130.yml
+#   conda activate simrecon-aarch64
+#   bash install_cuda_extensions.sh
+#
+# 匯出鎖定清單（可選）：
+#   conda env export --no-builds > conda-lock-aarch64.yml
+#
+name: simrecon-aarch64
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - setuptools>=61
+  - wheel
+  - cmake
+  - ninja
+  - pip:
+      - -r requirements-aarch64-conda-pip.txt

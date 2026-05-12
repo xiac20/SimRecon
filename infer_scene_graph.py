@@ -24,11 +24,18 @@ import json
 import os
 import re
 from pathlib import Path
+from threading import Thread
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from PIL import Image
-from transformers import AutoModelForImageTextToText, AutoProcessor
+from tqdm import tqdm
+from transformers import AutoModelForImageTextToText, AutoProcessor, TextIteratorStreamer
+
+
+def _log(msg: str) -> None:
+    """與 tqdm 並用時不衝破進度條。"""
+    tqdm.write(str(msg))
 
 
 def load_model(model_path: str = "Qwen/Qwen3-VL-8B-Thinking"):
@@ -73,7 +80,9 @@ def infer_objects_and_relations(
     processor,
     image_path: str,
     object_ids: List[int],
-) -> Dict[str, Any]:
+    max_new_tokens: int = 32768,
+    stream_progress: bool = True,
+) -> str:
     """
     Use Qwen3-VL to infer object categories and support relations for each ID in the image.
     
@@ -84,7 +93,7 @@ def infer_objects_and_relations(
         object_ids: List of object IDs in the image
     
     Returns:
-        Inference result dictionary
+        模型完整輸出字串（含 Thinking 推理與 JSON）
     """
     # Convert ID to display ID (id + 3)
     display_ids = [oid + 3 for oid in object_ids]
@@ -169,17 +178,50 @@ Now analyze the image and output the complete JSON with all {num_objects} object
     )
     inputs = inputs.to(model.device)
 
+    _log(
+        f"  VLM 生成中（Qwen3-VL-Thinking 常先輸出長篇推理，max_new_tokens={max_new_tokens}，單幀數分鐘屬正常）..."
+    )
+
     with torch.no_grad():
-        generated_ids = model.generate(**inputs, max_new_tokens=32768)  # Increase length limit to support multi-object output
-    
+        if stream_progress:
+            try:
+                tokenizer = getattr(processor, "tokenizer", None)
+                if tokenizer is None:
+                    raise RuntimeError("processor 無 tokenizer，無法串流進度")
+                streamer = TextIteratorStreamer(
+                    tokenizer, skip_prompt=True, skip_special_tokens=True
+                )
+                gen_kwargs = {**dict(inputs), "max_new_tokens": max_new_tokens, "streamer": streamer}
+
+                def _run_generate() -> None:
+                    with torch.no_grad():
+                        model.generate(**gen_kwargs)
+
+                thread = Thread(target=_run_generate)
+                thread.start()
+                chunks: List[str] = []
+                for piece in tqdm(
+                    streamer,
+                    desc="  generating",
+                    leave=False,
+                    unit="chunk",
+                ):
+                    chunks.append(piece)
+                thread.join()
+                return "".join(chunks)
+            except Exception as e:
+                _log(f"  串流進度不可用（{e}），改為一次性 generate。")
+
+        generated_ids = model.generate(**inputs, max_new_tokens=max_new_tokens)
+
     generated_ids_trimmed = [
-        out_ids[len(in_ids):] 
+        out_ids[len(in_ids):]
         for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
     ]
     output_text = processor.batch_decode(
-        generated_ids_trimmed, 
-        skip_special_tokens=True, 
-        clean_up_tokenization_spaces=False
+        generated_ids_trimmed,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
     )[0]
 
     return output_text
@@ -542,48 +584,55 @@ def process_single_frame(
     id_scene_path: str,
     output_dir: str,
     frame_name: str,
+    max_new_tokens: int = 32768,
+    stream_progress: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """Process single frame and save results."""
-    print(f"\n{'='*60}")
-    print(f"Processing frame: {frame_name}")
-    print(f"Input: {id_scene_path}")
-    
+    _log(f"\n{'='*60}")
+    _log(f"Processing frame: {frame_name}")
+    _log(f"Input: {id_scene_path}")
+
     # Extract all instance IDs in this frame
     object_ids = extract_ids_from_image_name(id_scene_path)
-    print(f"Detected object IDs (instance_id): {object_ids}")
-    print(f"Display IDs (instance_id + 3): {[oid + 3 for oid in object_ids]}")
-    
+    _log(f"Detected object IDs (instance_id): {object_ids}")
+    _log(f"Display IDs (instance_id + 3): {[oid + 3 for oid in object_ids]}")
+
     if not object_ids:
-        print("No objects found in this frame. Skipping.")
+        _log("No objects found in this frame. Skipping.")
         return None
-    
+
     # Inference
-    print("Running inference...")
+    _log("Running inference...")
     raw_output = infer_objects_and_relations(
-        model, processor, id_scene_path, object_ids
+        model,
+        processor,
+        id_scene_path,
+        object_ids,
+        max_new_tokens=max_new_tokens,
+        stream_progress=stream_progress,
     )
-    
-    print("\n--- Model Raw Output ---")
-    print(raw_output[:500] + "..." if len(raw_output) > 500 else raw_output)
-    print("--- End of Raw Output ---\n")
-    
+
+    _log("\n--- Model Raw Output ---")
+    _log(raw_output[:500] + "..." if len(raw_output) > 500 else raw_output)
+    _log("--- End of Raw Output ---\n")
+
     # Parse output
     parsed_result = parse_model_output(raw_output)
-    
+
     # Post-processing: filter, deduplicate, correct physical errors
     display_ids = [oid + 3 for oid in object_ids]
     if parsed_result.get("objects"):
-        print(f"Before post-processing: {len(parsed_result['objects'])} objects")
+        _log(f"Before post-processing: {len(parsed_result['objects'])} objects")
         parsed_result["objects"] = post_process_objects(parsed_result["objects"], display_ids)
-        print(f"After post-processing: {len(parsed_result['objects'])} objects")
+        _log(f"After post-processing: {len(parsed_result['objects'])} objects")
     
     # Build scene graph
     scene_graph = build_scene_graph(parsed_result)
     
     # Generate text visualization
     text_viz = visualize_scene_graph_text(scene_graph)
-    print(text_viz)
-    
+    _log(text_viz)
+
     # Save results
     # 1. JSON format
     json_path = os.path.join(output_dir, f"{frame_name}.json")
@@ -595,18 +644,18 @@ def process_single_frame(
     }
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(result_data, f, indent=2, ensure_ascii=False)
-    print(f"Saved: {json_path}")
-    
+    _log(f"Saved: {json_path}")
+
     # 2. HTML visualization
     html_path = os.path.join(output_dir, f"{frame_name}.html")
     generate_scene_graph_html(scene_graph, html_path)
-    print(f"Saved: {html_path}")
-    
+    _log(f"Saved: {html_path}")
+
     # 3. Text format
     txt_path = os.path.join(output_dir, f"{frame_name}.txt")
     with open(txt_path, 'w', encoding='utf-8') as f:
         f.write(text_viz)
-    print(f"Saved: {txt_path}")
+    _log(f"Saved: {txt_path}")
     
     return result_data
 
@@ -637,7 +686,18 @@ def main():
         default="Qwen/Qwen3-VL-8B-Thinking",
         help="Qwen3-VL model name or path",
     )
-    
+    parser.add_argument(
+        "--max_new_tokens",
+        type=int,
+        default=32768,
+        help="單次生成上限（物體多時勿過低；預設 32768）",
+    )
+    parser.add_argument(
+        "--no_stream_progress",
+        action="store_true",
+        help="關閉生成串流進度條（除錯或與舊版 transformers 不相容時使用）",
+    )
+
     args = parser.parse_args()
     
     # Determine run mode
@@ -667,7 +727,15 @@ def main():
         os.makedirs(output_dir, exist_ok=True)
         print(f"Output dir: {output_dir}")
         
-        process_single_frame(model, processor, args.id_scene_path, output_dir, frame_name)
+        process_single_frame(
+            model,
+            processor,
+            args.id_scene_path,
+            output_dir,
+            frame_name,
+            max_new_tokens=args.max_new_tokens,
+            stream_progress=not args.no_stream_progress,
+        )
         
     else:
         # ========== Batch mode ==========
@@ -690,24 +758,35 @@ def main():
             if os.path.isdir(os.path.join(instance_project_dir, d))
         ])
         
-        print(f"Found {len(frame_dirs)} frames to process")
-        
-        all_results = {}
-        for frame_name in frame_dirs:
+        pending = []
+        for frame_name in sorted(frame_dirs):
             id_scene_path = os.path.join(instance_project_dir, frame_name, "id_scene.png")
-            
             if not os.path.exists(id_scene_path):
-                print(f"Warning: id_scene.png not found in {frame_name}, skipping")
+                _log(f"Warning: id_scene.png not found in {frame_name}, skipping")
                 continue
-            
+            pending.append((frame_name, id_scene_path))
+
+        _log(f"Found {len(frame_dirs)} frame directories, {len(pending)} with id_scene.png")
+
+        all_results = {}
+        for frame_name, id_scene_path in tqdm(
+            pending,
+            desc="Scene graph inference",
+            unit="frame",
+        ):
             result = process_single_frame(
-                model, processor, id_scene_path, output_dir, frame_name
+                model,
+                processor,
+                id_scene_path,
+                output_dir,
+                frame_name,
+                max_new_tokens=args.max_new_tokens,
+                stream_progress=not args.no_stream_progress,
             )
-            
+
             if result:
                 all_results[frame_name] = result
-            
-            # Clear GPU memory
+
             torch.cuda.empty_cache()
         
         # Save summary results

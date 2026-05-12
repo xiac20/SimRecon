@@ -12,6 +12,7 @@
 #ifndef CUDA_RASTERIZER_BACKWARD_H_INCLUDED
 #define CUDA_RASTERIZER_BACKWARD_H_INCLUDED
 
+#include <cstdint>
 #include <cuda.h>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"

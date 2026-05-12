@@ -12,7 +12,9 @@
 from setuptools import setup
 from torch.utils.cpp_extension import CUDAExtension, BuildExtension
 import os
-os.path.dirname(os.path.abspath(__file__))
+
+_glm_inc = "-I" + os.path.join(os.path.dirname(os.path.abspath(__file__)), "third_party/glm/")
+_warn_suppress = ["-Wno-deprecated-declarations"]
 
 setup(
     name="diff_surfel_rasterization",
@@ -27,7 +29,10 @@ setup(
             "cuda_rasterizer/backward.cu",
             "rasterize_points.cu",
             "ext.cpp"],
-            extra_compile_args={"nvcc": ["-I" + os.path.join(os.path.dirname(os.path.abspath(__file__)), "third_party/glm/")]})
+            extra_compile_args={
+                "cxx": _warn_suppress,
+                "nvcc": [_glm_inc, "-Xcompiler=" + ",".join(_warn_suppress)],
+            })
         ],
     cmdclass={
         'build_ext': BuildExtension

@@ -10,6 +10,7 @@
  */
 
 #include "rasterizer_impl.h"
+#include <cstdint>
 #include <iostream>
 #include <fstream>
 #include <algorithm>

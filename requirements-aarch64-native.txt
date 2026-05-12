@@ -1,0 +1,3 @@
+# diff-surfel-rasterization / simple-knn 的 setup.py 會 import torch；須使用 --no-build-isolation（見 install_cuda_extensions.sh）。
+-e submodules/diff-surfel-rasterization
+submodules/simple-knn

@@ -1,0 +1,21 @@
+# 不含需在 setup.py 階段 import torch 的 CUDA 擴充（見 requirements-aarch64-native.txt）。
+# 原 requirements.txt 中 numpy==1.24.4 與 PyTorch 2.10 / NumPy 2.x 生態較難並存，aarch64 放寬為相容區間。
+
+plyfile
+tqdm
+# aarch64：PyPI 僅提供 dearpygui 2.3.x（無 1.11.1）；與 x86 requirements.txt 的 1.11.1 分流。
+dearpygui==2.3.1
+opencv-python
+pillow
+scikit-learn
+joblib
+numpy>=1.26,<2.3
+open3d>=0.16.0
+matplotlib
+trimesh
+lpips
+e3nn
+einops
+einsum
+kornia
+pyrender

@@ -25,7 +25,7 @@
 #include <functional>
 
 #define CHECK_INPUT(x)											\
-	AT_ASSERTM(x.type().is_cuda(), #x " must be a CUDA tensor")
+	AT_ASSERTM(x.is_cuda(), #x " must be a CUDA tensor")
 	// AT_ASSERTM(x.is_contiguous(), #x " must be contiguous")
 
 std::function<char*(size_t N)> resizeFunctional(torch::Tensor& t) {
@@ -122,29 +122,29 @@ RasterizeGaussiansCUDA(
 		binningFunc,
 		imgFunc,
 		P, degree, M, F,
-		background.contiguous().data<float>(),
+		background.contiguous().data_ptr<float>(),
 		W, H,
-		means3D.contiguous().data<float>(),
+		means3D.contiguous().data_ptr<float>(),
 		sh.contiguous().data_ptr<float>(),
-		colors.contiguous().data<float>(), 
-		opacity.contiguous().data<float>(), 
+		colors.contiguous().data_ptr<float>(), 
+		opacity.contiguous().data_ptr<float>(), 
 		scales.contiguous().data_ptr<float>(),
 		scale_modifier,
 		rotations.contiguous().data_ptr<float>(),
-		transMat_precomp.contiguous().data<float>(),
-        extra_attrs.contiguous().data<float>(), // note
-		viewmatrix.contiguous().data<float>(), 
-		projmatrix.contiguous().data<float>(),
-		campos.contiguous().data<float>(),
+		transMat_precomp.contiguous().data_ptr<float>(),
+        extra_attrs.contiguous().data_ptr<float>(), // note
+		viewmatrix.contiguous().data_ptr<float>(), 
+		projmatrix.contiguous().data_ptr<float>(),
+		campos.contiguous().data_ptr<float>(),
 		tan_fovx,
 		tan_fovy,
 		prefiltered,
-		out_color.contiguous().data<float>(),
-		out_others.contiguous().data<float>(),
-        out_extra.contiguous().data<float>(), // note
-        gau_related_pixels.contiguous().data<int>(),
-        gau_pixel_indices.data<int>(),
-		radii.contiguous().data<int>(),
+		out_color.contiguous().data_ptr<float>(),
+		out_others.contiguous().data_ptr<float>(),
+        out_extra.contiguous().data_ptr<float>(), // note
+        gau_related_pixels.contiguous().data_ptr<int>(),
+        gau_pixel_indices.data_ptr<int>(),
+		radii.contiguous().data_ptr<int>(),
 		debug);
   }
   return std::make_tuple(rendered, out_color, out_others, radii,out_extra, geomBuffer, binningBuffer, imgBuffer, gau_related_pixels, gau_pixel_indices);
@@ -223,38 +223,38 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
   if(P != 0)
   {  
 	  CudaRasterizer::Rasterizer::backward(P, degree, M, R, F,
-	  background.contiguous().data<float>(),
+	  background.contiguous().data_ptr<float>(),
 	  W, H, 
-	  means3D.contiguous().data<float>(),
-	  sh.contiguous().data<float>(),
-	  colors.contiguous().data<float>(),
+	  means3D.contiguous().data_ptr<float>(),
+	  sh.contiguous().data_ptr<float>(),
+	  colors.contiguous().data_ptr<float>(),
 	  scales.data_ptr<float>(),
 	  scale_modifier,
 	  rotations.data_ptr<float>(),
-	  transMat_precomp.contiguous().data<float>(),
-      extra_attrs.contiguous().data<float>(),
-	  viewmatrix.contiguous().data<float>(),
-	  projmatrix.contiguous().data<float>(),
-	  campos.contiguous().data<float>(),
+	  transMat_precomp.contiguous().data_ptr<float>(),
+      extra_attrs.contiguous().data_ptr<float>(),
+	  viewmatrix.contiguous().data_ptr<float>(),
+	  projmatrix.contiguous().data_ptr<float>(),
+	  campos.contiguous().data_ptr<float>(),
 	  tan_fovx,
 	  tan_fovy,
-	  radii.contiguous().data<int>(),
+	  radii.contiguous().data_ptr<int>(),
 	  reinterpret_cast<char*>(geomBuffer.contiguous().data_ptr()),
 	  reinterpret_cast<char*>(binningBuffer.contiguous().data_ptr()),
 	  reinterpret_cast<char*>(imageBuffer.contiguous().data_ptr()),
-	  dL_dout_color.contiguous().data<float>(),
-	  dL_dout_others.contiguous().data<float>(),
-      dL_dout_extra.contiguous().data<float>(),
-	  dL_dmeans2D.contiguous().data<float>(),
-	  dL_dnormal.contiguous().data<float>(),  
-	  dL_dopacity.contiguous().data<float>(),
-	  dL_dcolors.contiguous().data<float>(),
-	  dL_dmeans3D.contiguous().data<float>(),
-	  dL_dtransMat.contiguous().data<float>(),
-	  dL_dsh.contiguous().data<float>(),
-	  dL_dscales.contiguous().data<float>(),
-	  dL_drotations.contiguous().data<float>(),
-      dL_dextra_attrs.contiguous().data<float>(),
+	  dL_dout_color.contiguous().data_ptr<float>(),
+	  dL_dout_others.contiguous().data_ptr<float>(),
+      dL_dout_extra.contiguous().data_ptr<float>(),
+	  dL_dmeans2D.contiguous().data_ptr<float>(),
+	  dL_dnormal.contiguous().data_ptr<float>(),  
+	  dL_dopacity.contiguous().data_ptr<float>(),
+	  dL_dcolors.contiguous().data_ptr<float>(),
+	  dL_dmeans3D.contiguous().data_ptr<float>(),
+	  dL_dtransMat.contiguous().data_ptr<float>(),
+	  dL_dsh.contiguous().data_ptr<float>(),
+	  dL_dscales.contiguous().data_ptr<float>(),
+	  dL_drotations.contiguous().data_ptr<float>(),
+      dL_dextra_attrs.contiguous().data_ptr<float>(),
 	  debug);
   }
 
@@ -273,10 +273,10 @@ torch::Tensor markVisible(
   if(P != 0)
   {
 	CudaRasterizer::Rasterizer::markVisible(P,
-		means3D.contiguous().data<float>(),
-		viewmatrix.contiguous().data<float>(),
-		projmatrix.contiguous().data<float>(),
-		present.contiguous().data<bool>());
+		means3D.contiguous().data_ptr<float>(),
+		viewmatrix.contiguous().data_ptr<float>(),
+		projmatrix.contiguous().data_ptr<float>(),
+		present.contiguous().data_ptr<bool>());
   }
   
   return present;

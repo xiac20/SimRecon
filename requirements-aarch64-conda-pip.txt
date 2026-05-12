@@ -1,0 +1,7 @@
+# conda env create 用：--extra-index-url 須與 URL 同一行。
+# CUDA 擴充勿列於此；環境建立後執行 ./install_cuda_extensions.sh
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.10.0+cu130
+torchvision==0.25.0+cu130
+torchaudio==2.10.0+cu130
+-r requirements-aarch64-pypi-only.txt

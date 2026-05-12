@@ -8,6 +8,7 @@ from arguments import ModelParams, PipelineParams, OptimizationParams
 from spatial_track.spatialtrack import GausCluster
 from gaussian_renderer import render
 from scene import Scene, GaussianModel
+from scene.gaussian_model import _should_export_open3d_auxiliary_plys, _write_xyz_rgb_ply
 from utils.contrastive_utils import *
 from utils.general_mesh_utils import *
 from tqdm import tqdm
@@ -530,9 +531,21 @@ class SegSplatting:
         """Semantic feature training main loop: single-view contrast + multi-view contrast + 3D contrast."""
         print("\n\033[91mRunning Spatial Contrastive Learning... \033[0m")
 
-        if os.path.exists(
-                os.path.join(self.model_path, "point_cloud/iteration_{}".format(self.optimparams.iterations))):
+        # 僅以「最終匯出是否完成」為準：舊邏輯只判斷 iteration 目錄存在會誤跳過（例如僅有 scene.save 的 ply、
+        # 或後續 optimize 寫入的子目錄），導致從未執行 export_segment_results_final，因而沒有 instance_info.json。
+        final_iter_dir = os.path.join(
+            self.model_path, "point_cloud", "iteration_{}".format(self.optimparams.iterations)
+        )
+        export_marker = os.path.join(final_iter_dir, "instance_info.json")
+        if os.path.isfile(export_marker):
+            print(
+                f"Skip semantic feature training: found completed export {export_marker}"
+            )
             return
+        if os.path.isdir(final_iter_dir) and not os.path.isfile(export_marker):
+            print(
+                f"⚠️  目錄已存在但缺少 instance_info.json，將重新訓練並匯出: {final_iter_dir}"
+            )
 
         self.gaussians.training_setup(self.optimparams)
 
@@ -746,40 +759,60 @@ class SegSplatting:
         num_instances = int(self.Seg3D_masks.shape[1])
 
         instance_colors = self._deterministic_semantic_colors(num_instances)
-        
+
         # Write full colored point cloud + label array + separate point cloud for each instance
-        full_pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(scene_pclds))
-        colors = np.zeros((total_points, 3))
-        
+        colors = np.zeros((total_points, 3), dtype=np.float32)
+
         final_labels_np = final_labels.numpy().astype(np.int32, copy=False)
         for i, label in enumerate(final_labels_np):
             if label < 0 or label >= num_instances:
                 colors[i] = [1.0, 1.0, 1.0]
             else:
                 colors[i] = instance_colors[label]
-                
-        full_pcd.colors = o3d.utility.Vector3dVector(colors)
-        
-        o3d.io.write_point_cloud(os.path.join(save_dir, "point_cloud_labels.ply"), full_pcd)
-        
+
+        ply_labels = os.path.join(save_dir, "point_cloud_labels.ply")
+        if _should_export_open3d_auxiliary_plys():
+            full_pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(scene_pclds))
+            full_pcd.colors = o3d.utility.Vector3dVector(colors)
+            o3d.io.write_point_cloud(ply_labels, full_pcd)
+        else:
+            _write_xyz_rgb_ply(ply_labels, scene_pclds, colors)
+
         np.save(os.path.join(save_dir, "point_cloud_labels.npy"), final_labels_np)
-        
+
         save_partial_dir = os.path.join(save_dir, "label_pointclouds")
         os.makedirs(save_partial_dir, exist_ok=True)
         for new_label_id in range(num_instances):
             label_mask = final_labels == new_label_id
             if label_mask.sum() > 0:
                 label_positions = scene_pclds[label_mask.numpy()]
-                pcld = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(label_positions))
-                pcld.paint_uniform_color(instance_colors[new_label_id])
-                o3d.io.write_point_cloud(os.path.join(save_partial_dir, f"{new_label_id}.ply"), pcld)
-        
+                out_part = os.path.join(save_partial_dir, f"{new_label_id}.ply")
+                if _should_export_open3d_auxiliary_plys():
+                    pcld = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(label_positions))
+                    pcld.paint_uniform_color(instance_colors[new_label_id])
+                    o3d.io.write_point_cloud(out_part, pcld)
+                else:
+                    c = instance_colors[new_label_id]
+                    _write_xyz_rgb_ply(
+                        out_part,
+                        label_positions,
+                        np.broadcast_to(c, (label_positions.shape[0], 3)),
+                    )
+
         unassigned_label_mask = final_labels == -1
         if unassigned_label_mask.sum() > 0:
             unassigned_positions = scene_pclds[unassigned_label_mask.numpy()]
-            unassigned_pcld = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(unassigned_positions))
-            unassigned_pcld.paint_uniform_color([1.0, 1.0, 1.0])
-            o3d.io.write_point_cloud(os.path.join(save_partial_dir, "unassigned.ply"), unassigned_pcld)
+            out_un = os.path.join(save_partial_dir, "unassigned.ply")
+            if _should_export_open3d_auxiliary_plys():
+                unassigned_pcld = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(unassigned_positions))
+                unassigned_pcld.paint_uniform_color([1.0, 1.0, 1.0])
+                o3d.io.write_point_cloud(out_un, unassigned_pcld)
+            else:
+                _write_xyz_rgb_ply(
+                    out_un,
+                    unassigned_positions,
+                    np.ones((unassigned_positions.shape[0], 3), dtype=np.float32),
+                )
 
         # ========== Save best view images for each instance ==========
         self._export_instance_images(save_dir, save_images_dir, num_instances)

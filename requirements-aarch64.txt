@@ -1,0 +1,27 @@
+# aarch64 完整手動安裝時：先裝 PyTorch（cu130），再：
+#   pip install -r requirements-aarch64-pypi-only.txt
+#   pip install --no-build-isolation -r requirements-aarch64-native.txt
+# 或使用 conda 時：conda env create 後執行 ./install_cuda_extensions.sh
+#
+# 以下為「舊版單檔」聚合（仍可用，但 conda 請改用 requirements-aarch64-conda-pip.txt）
+
+plyfile
+tqdm
+dearpygui==2.3.1
+opencv-python
+pillow
+scikit-learn
+joblib
+numpy>=1.26,<2.3
+open3d>=0.16.0
+matplotlib
+trimesh
+lpips
+e3nn
+einops
+einsum
+kornia
+pyrender
+
+-e submodules/diff-surfel-rasterization
+submodules/simple-knn
